@@ -41,8 +41,8 @@ This repository provides kernel patches, technical documentation, and compilatio
 ## 🛠️ Modifying & Compiling the Drivers
 
 ### Modified Kernel Files
-- [`sound/soc/intel/boards/cht_bsw_rt5672.c`](file:///home/sidhant-aind/wyse-kernel/usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c)
-- [`sound/soc/intel/atom/sst-mfld-platform-pcm.c`](file:///home/sidhant-aind/wyse-kernel/usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c)
+- [`usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c`](usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c)
+- [`usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c`](usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c)
 
 ### Build Steps
 
