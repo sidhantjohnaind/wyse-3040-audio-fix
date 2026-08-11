@@ -1,0 +1,8 @@
+*.deb
+*.o
+*.ko
+*.mod
+*.mod.c
+*.symvers
+*.order
+.tmp_versions/
