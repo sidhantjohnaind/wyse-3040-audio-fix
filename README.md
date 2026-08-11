@@ -30,18 +30,71 @@ Because raw 44.1 kHz DSP stream allocation is physically rejected by hardware/fi
 
 ---
 
-## 📦 Binary Modules & Kernel Configuration
+## 🛠️ Building From Source
 
-- **Kernel Version**: Linux Kernel `6.12.100+deb13-amd64` (Debian Trixie/Sid)
+### Prerequisites
+On Debian / Ubuntu / Linux Mint systems, install standard kernel build utilities and build headers:
+```bash
+sudo apt update
+sudo apt install build-essential linux-headers-$(uname -r) git bc flex bison libssl-dev libelf-dev
+```
+
+### Step 1: Clone the Repository
+```bash
+git clone https://github.com/sidhantjohnaind/wyse-3040-audio-fix.git
+cd wyse-3040-audio-fix
+```
+
+### Step 2: Build the Sound Driver Modules
+Compile the driver modules against your active kernel headers:
+```bash
+# Navigate to the kernel source directory
+cd usr/src/linux-source-6.12
+
+# Build the machine driver module (cht_bsw_rt5672)
+make -C /lib/modules/$(uname -r)/build M=$PWD/sound/soc/intel/boards modules
+
+# Build the platform driver module (sst-atom-hifi2-platform)
+make -C /lib/modules/$(uname -r)/build M=$PWD/sound/soc/intel/atom modules
+```
+
+### Step 3: Install the Modules & Update Dependencies
+```bash
+# Install the compiled modules
+sudo make -C /lib/modules/$(uname -r)/build M=$PWD/sound/soc/intel/boards modules_install
+sudo make -C /lib/modules/$(uname -r)/build M=$PWD/sound/soc/intel/atom modules_install
+
+# Clean up compressed module overrides (.ko.xz) if present
+sudo rm -f /lib/modules/$(uname -r)/kernel/sound/soc/intel/boards/*.ko.xz
+sudo rm -f /lib/modules/$(uname -r)/kernel/sound/soc/intel/atom/*.ko.xz
+
+# Refresh module dependency maps
+sudo depmod -a
+```
+
+### Step 4: Reload Driver Modules (or Reboot)
+```bash
+# Unload old drivers
+sudo modprobe -r snd_soc_sst_cht_bsw_rt5672 snd_soc_sst_atom_hifi2_platform
+
+# Load updated drivers
+sudo modprobe snd_soc_sst_atom_hifi2_platform
+sudo modprobe snd_soc_sst_cht_bsw_rt5672
+```
+
+---
+
+## 📦 Quick Install via Pre-Compiled Binaries
+
+If you are running Linux Kernel `6.12.100+deb13-amd64` (or compatible 6.12.x kernels), you can skip building and install the pre-compiled `.ko` module binaries directly:
+
 - **Debian Kernel Config**: [`wyse-6.12.100.config`](wyse-6.12.100.config)
 - **Pre-Compiled Driver Modules**:
   1. [`snd-soc-sst-cht-bsw-rt5672.ko`](usr/src/linux-source-6.12/sound/soc/intel/boards/snd-soc-sst-cht-bsw-rt5672.ko) (Machine Driver)
   2. [`snd-soc-sst-atom-hifi2-platform.ko`](usr/src/linux-source-6.12/sound/soc/intel/atom/snd-soc-sst-atom-hifi2-platform.ko) (Platform Driver)
 
-### Quick Installation of Compiled Modules
-
 ```bash
-# Copy compiled modules to your module directory
+# Copy pre-compiled modules
 sudo cp usr/src/linux-source-6.12/sound/soc/intel/boards/snd-soc-sst-cht-bsw-rt5672.ko /lib/modules/$(uname -r)/kernel/sound/soc/intel/boards/
 sudo cp usr/src/linux-source-6.12/sound/soc/intel/atom/snd-soc-sst-atom-hifi2-platform.ko /lib/modules/$(uname -r)/kernel/sound/soc/intel/atom/
 
@@ -49,13 +102,13 @@ sudo cp usr/src/linux-source-6.12/sound/soc/intel/atom/snd-soc-sst-atom-hifi2-pl
 sudo rm -f /lib/modules/$(uname -r)/kernel/sound/soc/intel/boards/*.ko.xz
 sudo rm -f /lib/modules/$(uname -r)/kernel/sound/soc/intel/atom/*.ko.xz
 
-# Refresh module dependencies
+# Update depmod
 sudo depmod -a
 ```
 
 ---
 
-## 🛠️ Technical Root Causes & Kernel Fixes
+## 🔬 Technical Root Causes & Kernel Fixes
 
 | Issue | File Location | Root Cause | Solution |
 | :--- | :--- | :--- | :--- |
