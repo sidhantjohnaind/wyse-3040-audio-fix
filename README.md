@@ -10,6 +10,26 @@ This repository provides kernel patches, pre-compiled kernel module binaries (`.
 
 ---
 
+## 🔬 Hardware Limitations & Technical Deep-Dive
+
+> [!NOTE]
+> **Why Native 44.1 kHz Hardware Bit-Perfect Output Is Physically Unsupported**
+> 
+> A common question is why raw 44.1 kHz cannot be passed directly to the physical hardware without resampling. The limitation is driven by physical motherboard crystal oscillators and Intel SoC DSP firmware eFuse constraints:
+
+### 1. Master Clock (MCLK) & Crystal Oscillator Grid
+- **48 kHz Clock Grid**: The master crystal oscillator / PLL clock generator on the Dell Wyse 3040 motherboard supplies a **24.576 MHz** master clock (`48000 Hz × 512 = 24.576 MHz`).
+- **Missing 22.5792 MHz Crystal**: Native bit-perfect 44.1 kHz playback requires a **22.5792 MHz** master clock grid (`44100 Hz × 512 = 22.5792 MHz`). The Wyse 3040 PCB lacks a dedicated 22.5792 MHz crystal oscillator for 44.1k multiples.
+
+### 2. Intel SST DSP Firmware & SoC eFuse Limits
+- **Firmware Blob (`intel/fw_sst_22a8.bin`)**: The Intel Cherry Trail SST LPE DSP binary firmware blob internal Smart Bus Architecture (SBA) mixing pipeline is hardcoded and fused to operate **exclusively at 48000 Hz**.
+- **Hardware eFuse Constraints**: Internal SoC ROM / eFuse tables lock the DSP processing pipeline. Sending an IPC stream allocation request for raw 44.1 kHz to `fw_sst_22a8.bin` causes the firmware to reject the request with IPC error `0x80006` (`SST_ERR_INVALID_PARAM`).
+
+### 3. The Resampling Solution
+Because raw 44.1 kHz DSP stream allocation is physically rejected by hardware/firmware, our kernel patches configure ALSA (`plughw:0,0`), PulseAudio, and PipeWire to automatically accept **44.1 kHz, 88.2 kHz, 96 kHz, and 192 kHz** inputs at 16/24-bit and perform high-quality software resampling to 48 kHz before passing data to the DSP.
+
+---
+
 ## 📦 Binary Modules & Kernel Configuration
 
 - **Kernel Version**: Linux Kernel `6.12.100+deb13-amd64` (Debian Trixie/Sid)
@@ -35,57 +55,14 @@ sudo depmod -a
 
 ---
 
-## 🔬 Hardware & Firmware Architecture Analysis
+## 🛠️ Technical Root Causes & Kernel Fixes
 
-| Component | Hardware / Module | Behavior & Constraint |
-| :--- | :--- | :--- |
-| **SoC / DSP** | Intel Cherry Trail SST LPE (`intel/fw_sst_22a8.bin`) | The DSP firmware SBA (Smart Bus Architecture) mixing pipeline operates **exclusively at 48000 Hz**. Requesting raw non-48k DSP streams triggers IPC error `0x80006` (`SST_ERR_INVALID_PARAM`). |
-| **Audio Codec** | Realtek RT5672 | Connected via I2S / PCM DAI to the Intel SST LPE audio engine. Supports `S16_LE` and `S24_LE`. |
-| **ALSA Subsystem** | `snd-soc-cht-bsw-rt5672`, `snd-soc-sst-atom-hifi2-platform` | Manages DPCM Front-End (FE) and Back-End (BE) audio routing. |
-
-### Technical Root Causes & Fixes
-
-1. **DPCM Rate Merging Lock (`sound/soc/intel/boards/cht_bsw_rt5672.c`)**
-   - **Problem**: `.dpcm_merged_rate = 1` forced Front-End DAIs to merge Back-End 48 kHz constraints.
-   - **Fix**: Set `.dpcm_merged_rate = 0`.
-
-2. **Frame Step Constraint (`sound/soc/intel/atom/sst-mfld-platform-pcm.c`)**
-   - **Problem**: `snd_pcm_hw_constraint_step(..., 48)` forced period sizes to 48-frame multiples, rejecting non-48k frame math.
-   - **Fix**: Relaxed step constraint to `1`.
-
-3. **Static DAPM Clock Allocation (`sound/soc/intel/boards/cht_bsw_rt5672.c`)**
-   - **Problem**: Hardcoded `48000 * 512` sysclk calls in `platform_clock_control()` broke codec PLL power-on sequencing.
-   - **Fix**: Removed static clock overrides, permitting dynamic clock configuration.
-
-4. **DSP Stream Allocation Rate (`cht_codec_fixup`)**
-   - **Problem**: Direct 44.1 kHz allocation to `fw_sst_22a8.bin` caused DSP IPC error `0x80006`.
-   - **Fix**: Locked `cht_codec_fixup()` Back-End rate to `48000` Hz for DSP stability, enabling ALSA `plughw`/PulseAudio/PipeWire to resample non-48k streams transparently.
-
----
-
-## 🛠️ Source Files & Compilation
-
-### Modified Kernel Source Files
-- [`usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c`](usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c)
-- [`usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c`](usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c)
-
-### Build Steps
-
-```bash
-# Navigate to the kernel source root
-cd usr/src/linux-source-6.12
-
-# Build the sound modules
-make M=sound/soc/intel/boards modules
-make M=sound/soc/intel/atom modules
-
-# Install updated modules
-sudo make M=sound/soc/intel/boards modules_install
-sudo make M=sound/soc/intel/atom modules_install
-
-# Refresh module dependencies
-sudo depmod -a
-```
+| Issue | File Location | Root Cause | Solution |
+| :--- | :--- | :--- | :--- |
+| **DPCM Rate Merging Lock** | [`usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c`](usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c) | `.dpcm_merged_rate = 1` forced Front-End DAIs to merge Back-End rate constraints. | Set `.dpcm_merged_rate = 0`. |
+| **Frame Step Constraint** | [`usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c`](usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c) | `snd_pcm_hw_constraint_step(..., 48)` rejected non-48k frame periods. | Relaxed step constraint to `1`. |
+| **Static DAPM Clock** | [`usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c`](usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c) | Hardcoded `48000 * 512` sysclk broke codec PLL setup when DAPM clock widget powered on. | Removed static PLL/sysclk calls from `platform_clock_control()`. |
+| **SST DSP Stream Allocation** | [`usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c`](usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c) | Forcing raw 44.1k to `fw_sst_22a8.bin` caused IPC error `0x80006`. | Fixed `cht_codec_fixup()` rate to `48000` Hz for DSP stability. |
 
 ---
 
