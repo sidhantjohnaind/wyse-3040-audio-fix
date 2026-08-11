@@ -6,7 +6,32 @@
 ## 📌 Project Overview
 The **Dell Wyse 3040** thin client features an Intel Cherry Trail SoC paired with a Realtek RT5672 audio codec and Intel SST LPE (Low Power Engine) Audio DSP. By default in Linux mainline kernels (e.g. 6.x), audio playback is often restricted or locked to 48 kHz due to DPCM rate merging locks, static clock constraints, and DSP firmware boundaries.
 
-This repository provides kernel patches, technical documentation, and compilation instructions to enable full audio playback support across **44.1 kHz, 48 kHz, 88.2 kHz, 96 kHz, and 192 kHz** formats at **16-bit** and **24-bit** depth using ALSA, PulseAudio, and PipeWire sound servers.
+This repository provides kernel patches, pre-compiled kernel module binaries (`.ko`), Debian kernel configuration files, and technical documentation to enable full audio playback support across **44.1 kHz, 48 kHz, 88.2 kHz, 96 kHz, and 192 kHz** formats at **16-bit** and **24-bit** depth using ALSA, PulseAudio, and PipeWire sound servers.
+
+---
+
+## 📦 Binary Modules & Kernel Configuration
+
+- **Kernel Version**: Linux Kernel `6.12.100+deb13-amd64` (Debian Trixie/Sid)
+- **Debian Kernel Config**: [`wyse-6.12.100.config`](wyse-6.12.100.config)
+- **Pre-Compiled Driver Modules**:
+  1. [`snd-soc-sst-cht-bsw-rt5672.ko`](usr/src/linux-source-6.12/sound/soc/intel/boards/snd-soc-sst-cht-bsw-rt5672.ko) (Machine Driver)
+  2. [`snd-soc-sst-atom-hifi2-platform.ko`](usr/src/linux-source-6.12/sound/soc/intel/atom/snd-soc-sst-atom-hifi2-platform.ko) (Platform Driver)
+
+### Quick Installation of Compiled Modules
+
+```bash
+# Copy compiled modules to your module directory
+sudo cp usr/src/linux-source-6.12/sound/soc/intel/boards/snd-soc-sst-cht-bsw-rt5672.ko /lib/modules/$(uname -r)/kernel/sound/soc/intel/boards/
+sudo cp usr/src/linux-source-6.12/sound/soc/intel/atom/snd-soc-sst-atom-hifi2-platform.ko /lib/modules/$(uname -r)/kernel/sound/soc/intel/atom/
+
+# Remove conflicting compressed modules if present
+sudo rm -f /lib/modules/$(uname -r)/kernel/sound/soc/intel/boards/*.ko.xz
+sudo rm -f /lib/modules/$(uname -r)/kernel/sound/soc/intel/atom/*.ko.xz
+
+# Refresh module dependencies
+sudo depmod -a
+```
 
 ---
 
@@ -38,9 +63,9 @@ This repository provides kernel patches, technical documentation, and compilatio
 
 ---
 
-## 🛠️ Modifying & Compiling the Drivers
+## 🛠️ Source Files & Compilation
 
-### Modified Kernel Files
+### Modified Kernel Source Files
 - [`usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c`](usr/src/linux-source-6.12/sound/soc/intel/boards/cht_bsw_rt5672.c)
 - [`usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c`](usr/src/linux-source-6.12/sound/soc/intel/atom/sst-mfld-platform-pcm.c)
 
@@ -62,13 +87,11 @@ sudo make M=sound/soc/intel/atom modules_install
 sudo depmod -a
 ```
 
-*Note: Ensure any pre-existing compressed `.ko.xz` files in `/lib/modules/$(uname -r)/` are cleaned up so the system loads the new `.ko` modules.*
-
 ---
 
 ## 🧪 Verification & Testing Matrix
 
-Tested on Dell Wyse 3040 running Linux kernel `6.12`:
+Tested on Dell Wyse 3040 running Linux kernel `6.12.100+deb13-amd64`:
 
 | Sample Rate & Format | ALSA Device | Status | Output Quality |
 | :--- | :--- | :--- | :--- |
