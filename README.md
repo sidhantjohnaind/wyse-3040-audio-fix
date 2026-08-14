@@ -30,20 +30,30 @@ Because raw 44.1 kHz DSP stream allocation is physically rejected by hardware/fi
 
 ---
 
-## 🛠️ Building From Source
+## ⚡ Quick One-Command Automated Installation
 
-### Prerequisites
-On Debian / Ubuntu / Linux Mint systems, install standard kernel build utilities and build headers:
-```bash
-sudo apt update
-sudo apt install build-essential linux-headers-$(uname -r) git bc flex bison libssl-dev libelf-dev
-```
+You can build and install the driver modules with a single command:
 
-### Step 1: Clone the Repository
 ```bash
 git clone https://github.com/sidhantjohnaind/wyse-3040-audio-fix.git
 cd wyse-3040-audio-fix
+sudo ./install.sh
 ```
+
+---
+
+## 🔄 DKMS Support (Auto-Rebuild on Kernel Upgrades)
+
+To ensure your audio drivers **automatically rebuild and install whenever Debian updates to a new kernel version** via `apt upgrade`, register the DKMS package:
+
+```bash
+cd wyse-3040-audio-fix
+sudo ./dkms-install.sh
+```
+
+---
+
+## 🛠️ Manual Build From Source
 
 ### Step 2: Build the Sound Driver Modules
 Compile the driver modules against your active kernel headers:
