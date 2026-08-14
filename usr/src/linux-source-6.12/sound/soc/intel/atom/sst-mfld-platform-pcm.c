@@ -605,8 +605,6 @@ static int sst_soc_open(struct snd_soc_component *component,
 
 	runtime = substream->runtime;
 	runtime->hw = sst_platform_pcm_hw;
-	pr_err("=== SST SOC OPEN: rates=0x%x rate_min=%u rate_max=%u ===\n",
-	       runtime->hw.rates, runtime->hw.rate_min, runtime->hw.rate_max);
 	return 0;
 }
 
