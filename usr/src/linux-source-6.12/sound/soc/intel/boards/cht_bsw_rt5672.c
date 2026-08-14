@@ -306,10 +306,6 @@ static int cht_codec_fixup(struct snd_soc_pcm_runtime *rtd,
 
 static int cht_aif1_startup(struct snd_pcm_substream *substream)
 {
-	pr_err("=== CHT AIF1 STARTUP: hw.rate_min=%u hw.rate_max=%u hw.rates=0x%x ===\n",
-	       substream->runtime->hw.rate_min,
-	       substream->runtime->hw.rate_max,
-	       substream->runtime->hw.rates);
 	return 0;
 }
 
@@ -528,7 +524,6 @@ static int snd_cht_mc_probe(struct platform_device *pdev)
 			"snd_soc_register_card failed %d\n", ret_val);
 		return ret_val;
 	}
-	pr_err("=== CHT PROBE: dpcm_merged_rate=%d ===\n", cht_dailink[0].dpcm_merged_rate);
 	platform_set_drvdata(pdev, &snd_soc_card_cht);
 	return ret_val;
 }
